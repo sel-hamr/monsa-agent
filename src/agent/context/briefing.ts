@@ -15,6 +15,24 @@ function purchaseLine(purchase: Purchase, currency: string): string {
 }
 
 /**
+ * Spent, budget, remainder, and a per-day estimate — all safe to compute
+ * because the ledger and the profile agree on currency.
+ */
+function spendingLine(profile: Profile, spent: number, days: number): string {
+  const left = profile.monthlyBudget - spent;
+  return `Spent so far this month: ${formatMoney(spent, profile.currency)} of ${formatMoney(profile.monthlyBudget, profile.currency)}. ${formatMoney(left, profile.currency)} left, about ${formatMoney(left / days, profile.currency)} a day.`;
+}
+
+/**
+ * Spent and budget only, each in its own currency. There is no exchange rate
+ * in this app, so `left` and a per-day figure are never computed here — doing
+ * so would silently assume a 1:1 rate between two different currencies.
+ */
+function mismatchLine(profile: Profile, ledger: Ledger, spent: number): string {
+  return `Spent so far this month: ${formatMoney(spent, ledger.currency)}. The monthly budget is ${formatMoney(profile.monthlyBudget, profile.currency)}. These purchases were recorded in ${ledger.currency}, which is not the profile currency ${profile.currency}; say so rather than converting between them.`;
+}
+
+/**
  * The profile and this month's spending as a system message. Rebuilt each turn
  * so neither the date nor the totals it states can go stale in a long session.
  */
@@ -34,15 +52,14 @@ export function profileBriefing(profile: Profile, ledger: Ledger, now: Date): st
   }
 
   const spent = ledgerTotal(ledger);
-  const left = profile.monthlyBudget - spent;
-  const mismatch =
+  const summary =
     ledger.currency === profile.currency
-      ? ""
-      : ` These purchases were recorded in ${ledger.currency}, which is not the profile currency ${profile.currency}; say so rather than converting between them.`;
+      ? spendingLine(profile, spent, days)
+      : mismatchLine(profile, ledger, spent);
 
   return [
     head,
-    `Spent so far this month: ${formatMoney(spent, ledger.currency)} of ${formatMoney(profile.monthlyBudget, profile.currency)}. ${formatMoney(left, profile.currency)} left, about ${formatMoney(left / days, profile.currency)} a day.${mismatch}`,
+    summary,
     "Purchases this month, oldest first:",
     ...ledger.purchases.map((purchase) => purchaseLine(purchase, ledger.currency)),
     "To undo one, call removePurchase with the id in brackets.",

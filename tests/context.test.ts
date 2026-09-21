@@ -40,6 +40,11 @@ describe("profileBriefing", () => {
     assert.match(briefing, /430 MAD/, "the total spent");
     assert.match(briefing, /3,570 MAD/, "what remains");
     assert.doesNotMatch(briefing, /no spending has been recorded/i);
+    assert.doesNotMatch(
+      briefing,
+      /not the profile currency/i,
+      "no mismatch warning when the currencies agree",
+    );
   });
 
   test("lists every purchase with the id needed to remove it", () => {
@@ -57,6 +62,12 @@ describe("profileBriefing", () => {
     const briefing = profileBriefing(salah, inEuros, noon);
     assert.match(briefing, /EUR/);
     assert.match(briefing, /not the profile currency/i);
+    assert.doesNotMatch(
+      briefing,
+      /left, about/i,
+      "no fabricated remainder or per-day figure across currencies",
+    );
+    assert.doesNotMatch(briefing, /\ba day\b/i, "no per-day figure across currencies");
   });
 });
 
