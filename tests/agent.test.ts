@@ -14,9 +14,9 @@ type CapturedBody = {
 };
 
 /** Answer the model call locally, and hand back what was sent to it. */
-async function captureRequest(run: () => Promise<string>): Promise<{
+async function captureRequest<T>(run: () => Promise<T>): Promise<{
   body: CapturedBody;
-  text: string;
+  result: T;
 }> {
   const realFetch = globalThis.fetch;
   let body: CapturedBody = {};
@@ -37,8 +37,8 @@ async function captureRequest(run: () => Promise<string>): Promise<{
   }) as typeof globalThis.fetch;
 
   try {
-    const text = await run();
-    return { body, text };
+    const result = await run();
+    return { body, result };
   } finally {
     globalThis.fetch = realFetch;
   }
@@ -55,7 +55,9 @@ describe("runAgent", () => {
       new Date(2026, 8, 20),
     );
 
-    const { body, text } = await captureRequest(() => runAgent({ messages }));
+    const { body, result } = await captureRequest(() =>
+      runAgent({ profile, messages }),
+    );
 
     const sent = JSON.stringify(body.system);
     assert.match(sent, /budgeting for Salah/, "the briefing should reach the model");
@@ -68,6 +70,54 @@ describe("runAgent", () => {
       ["user"],
       "only the user turn belongs in messages",
     );
-    assert.equal(text, "You have 4,000 MAD for September.");
+    assert.equal(result.text, "You have 4,000 MAD for September.");
+    assert.deepEqual(result.proposals, [], "a plain answer proposes nothing");
+  });
+
+  test("a recordPurchase call comes back as a proposal, and nothing is written", async () => {
+    const profile = createProfile("Salah", 4000, "MAD");
+    const messages = buildAgentMessages(
+      profile,
+      emptyLedger("2026-09", "MAD"),
+      [],
+      "i bought coffee for 30",
+      new Date(2026, 8, 20),
+    );
+
+    const realFetch = globalThis.fetch;
+    let call = 0;
+    globalThis.fetch = (async () => {
+      call += 1;
+      const content =
+        call === 1
+          ? [
+              {
+                type: "tool_use",
+                id: "toolu_1",
+                name: "recordPurchase",
+                input: { amount: 30, label: "coffee" },
+              },
+            ]
+          : [{ type: "text", text: "Want me to record coffee?" }];
+      return new Response(
+        JSON.stringify({
+          id: "msg_test",
+          type: "message",
+          role: "assistant",
+          model: "claude-opus-5",
+          content,
+          stop_reason: call === 1 ? "tool_use" : "end_turn",
+          usage: { input_tokens: 10, output_tokens: 10 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof globalThis.fetch;
+
+    try {
+      const result = await runAgent({ profile, messages });
+      assert.deepEqual(result.proposals, [{ amount: 30, label: "coffee" }]);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 });
