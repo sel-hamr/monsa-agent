@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { addPurchase, loadLedger, monthKey, saveLedger, standing } from "../../config/expenses.js";
 import type { Ledger } from "../../config/expenses.js";
@@ -37,6 +37,18 @@ export function usePurchaseFlow(
   const [pending, setPending] = useState<PurchaseProposal[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
 
+  /**
+   * Every confirmed write is chained onto this promise rather than fired
+   * independently. Two proposals can be queued from one agent turn, and
+   * answering them in quick succession must not let two `save()` calls
+   * interleave their `loadLedger` / `saveLedger` — the second would load the
+   * file before the first has written, and its save would silently discard
+   * the first purchase. `run` always resolves (it catches its own errors),
+   * so the chain itself never rejects and a failed write cannot wedge the
+   * ones queued behind it.
+   */
+  const writeChain = useRef<Promise<void>>(Promise.resolve());
+
   const save = useCallback(
     async (proposal: PurchaseProposal, forProfile: Profile) => {
       const month = monthKey(new Date());
@@ -48,6 +60,16 @@ export function usePurchaseFlow(
     },
     [onSaved],
   );
+
+  // A proposal answered before the profile is reset must not still be
+  // sitting there once a new profile (possibly a new currency) is created —
+  // it would ask a question about the old session and write into the new one.
+  useEffect(() => {
+    if (profile === null) {
+      setPending([]);
+      setNotice(null);
+    }
+  }, [profile]);
 
   const handleInput = useCallback(
     (value: string) => {
@@ -62,10 +84,12 @@ export function usePurchaseFlow(
       }
 
       setNotice(null);
-      void save(answer.proposal, profile).catch((cause: unknown) => {
-        const reason = cause instanceof Error ? cause.message : "unknown error";
-        setNotice(`Could not record ${answer.proposal.label}: ${reason}`);
-      });
+      const run = () =>
+        save(answer.proposal, profile).catch((cause: unknown) => {
+          const reason = cause instanceof Error ? cause.message : "unknown error";
+          setNotice(`Could not record ${answer.proposal.label}: ${reason}`);
+        });
+      writeChain.current = writeChain.current.then(run);
       return true;
     },
     [pending, profile, save],

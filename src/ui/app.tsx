@@ -67,7 +67,9 @@ export function App({ name }: AppProps) {
         <Text color="yellow">Delete {profilePath()}? (y/n)</Text>
       )}
       {reset.notice !== null && <Text dimColor>{reset.notice}</Text>}
-      {purchases.question !== null && <Text color="yellow">{purchases.question}</Text>}
+      {!reset.isConfirming && purchases.question !== null && (
+        <Text color="yellow">{purchases.question}</Text>
+      )}
       {purchases.notice !== null && <Text dimColor>{purchases.notice}</Text>}
 
       {isLoading ? (
