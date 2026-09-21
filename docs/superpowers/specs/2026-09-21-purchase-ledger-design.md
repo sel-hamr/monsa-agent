@@ -1,7 +1,7 @@
 # Purchase ledger — design
 
 Date: 2026-09-21
-Status: approved, not yet implemented
+Status: implemented (commits 72be48d..e85d432)
 
 ## Problem
 
@@ -141,10 +141,11 @@ Ids come from `randomUUID().slice(0, 8)`. Collision risk across the ~dozens of
 purchases in a month is negligible, and a short id is easier for the model to
 quote back correctly than a full UUID.
 
-Malformed-file handling mirrors `loadProfile`: parse defensively, validate each
-purchase, drop the file's contents entirely rather than throw. A corrupt ledger
-costs the month's history, but never prevents the agent from starting — the
-same trade `loadProfile` already makes.
+Malformed-file handling mirrors `loadProfile`: parse defensively rather than
+throw. A file that is unreadable or not an object at all reads as an empty
+month; a single malformed row inside an otherwise valid file is dropped on its
+own, so the rest of the month survives it. Either way a corrupt ledger never
+prevents the agent from starting — the same trade `loadProfile` already makes.
 
 ## Module: `src/agent/tools/purchases.ts`
 
@@ -220,8 +221,8 @@ Revisit this if the honesty risk below ever shows up in practice, or if the app
 moves to `streamText` and the `Chat` abstraction for other reasons.
 
 **New hook `src/ui/hooks/use-purchase-flow.ts`**, mirroring `useResetFlow`:
-holds a queue of pending proposals, exposes `isConfirming`, the proposal being
-asked about, a `notice`, and `handleInput(value) => boolean`. It is chained
+holds a queue of pending proposals, exposes the `question` being asked, a
+`notice`, and `handleInput(value) => boolean`. It is chained
 into `onSubmit` in `src/ui/app.tsx` alongside `reset.handleInput`.
 
 A **queue**, not a single slot: the model can propose two purchases in one turn
@@ -335,7 +336,7 @@ must be updated to cover the empty-ledger case specifically.**
 money into or out of the file, so it is tested directly as a reducer over
 inputs, independent of React:
 
-- A proposal makes `isConfirming` true and writes nothing yet.
+- A proposal makes the queue non-empty and writes nothing yet.
 - "y" writes exactly one purchase and clears the queue.
 - "n" writes nothing and clears the queue.
 - Anything unclear ("maybe", "") is a no and writes nothing.
