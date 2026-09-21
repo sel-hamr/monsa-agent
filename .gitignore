@@ -5,3 +5,6 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Subagent-driven-development scratch (ledger, briefs, review packages)
+.superpowers/
