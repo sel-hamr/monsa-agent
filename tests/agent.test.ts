@@ -4,6 +4,7 @@ import test, { describe } from "node:test";
 import { runAgent } from "../src/agent/run.js";
 import { buildAgentMessages } from "../src/agent/context/index.js";
 import { createProfile } from "../src/config/profile.js";
+import { emptyLedger } from "../src/config/expenses.js";
 
 process.env["ANTHROPIC_API_KEY"] = "test-key-not-real";
 
@@ -46,7 +47,13 @@ async function captureRequest(run: () => Promise<string>): Promise<{
 describe("runAgent", () => {
   test("sends the profile briefing and the conversation to the model", async () => {
     const profile = createProfile("Salah", 4000, "MAD");
-    const messages = buildAgentMessages(profile, [], "how much do I have?", new Date(2026, 8, 20));
+    const messages = buildAgentMessages(
+      profile,
+      emptyLedger("2026-09", "MAD"),
+      [],
+      "how much do I have?",
+      new Date(2026, 8, 20),
+    );
 
     const { body, text } = await captureRequest(() => runAgent({ messages }));
 
