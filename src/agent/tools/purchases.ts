@@ -4,12 +4,13 @@ import { tool } from "ai";
 import { z } from "zod";
 
 import {
-  ledgerTotal,
   loadLedger,
   monthKey,
   removePurchase as removeFromLedger,
   saveLedger,
+  standing,
 } from "../../config/expenses.js";
+import type { Ledger } from "../../config/expenses.js";
 import { formatMoney } from "../../config/profile.js";
 import type { Profile } from "../../config/profile.js";
 
@@ -21,13 +22,20 @@ export const purchaseProposalSchema = z.object({
 
 export type PurchaseProposal = z.infer<typeof purchaseProposalSchema>;
 
-/** "Spent X of Y this month; Z left." */
-function standing(spent: number, profile: Profile): string {
-  const left = profile.monthlyBudget - spent;
+/** "Spent X of Y this month; Z left." — or, mismatched, spent and budget with no remainder. */
+function standingLine(profile: Profile, ledger: Ledger): string {
+  const s = standing(profile, ledger);
+  if (s.kind === "aligned") {
+    return (
+      `Spent ${formatMoney(s.spent, s.currency)} of ` +
+      `${formatMoney(s.budget, s.currency)} this month; ` +
+      `${formatMoney(s.left, s.currency)} left.`
+    );
+  }
   return (
-    `Spent ${formatMoney(spent, profile.currency)} of ` +
-    `${formatMoney(profile.monthlyBudget, profile.currency)} this month; ` +
-    `${formatMoney(left, profile.currency)} left.`
+    `Spent ${formatMoney(s.spent, s.spentCurrency)} this month, against a budget of ` +
+    `${formatMoney(s.budget, s.budgetCurrency)}. These are in different currencies, so no ` +
+    `remainder is shown.`
   );
 }
 
@@ -57,7 +65,7 @@ export function buildPurchaseTools(profile: Profile) {
         await saveLedger(after);
         return (
           `Removed ${removed.label}, ${formatMoney(removed.amount, ledger.currency)}. ` +
-          standing(ledgerTotal(after), profile)
+          standingLine(profile, after)
         );
       },
     }),

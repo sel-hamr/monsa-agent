@@ -6,6 +6,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { profileDir } from "./profile.js";
+import type { Profile } from "./profile.js";
 
 export interface Purchase {
   /** Short id, unique within the file. What removePurchase takes. */
@@ -37,6 +38,45 @@ export function emptyLedger(month: string, currency: string): Ledger {
 
 export function ledgerTotal(ledger: Ledger): number {
   return ledger.purchases.reduce((total, purchase) => total + purchase.amount, 0);
+}
+
+/**
+ * Where the budget stands, without an exchange rate. There is no conversion
+ * anywhere in this app, so `aligned` — the only variant carrying a `left`
+ * figure — is reachable only when the ledger and the profile already agree on
+ * currency. A caller cannot read a remainder off the `mismatched` variant
+ * because the field does not exist on it; this is what makes computing a
+ * fabricated remainder a type error rather than a bug someone has to notice.
+ */
+export type Standing =
+  | { kind: "aligned"; currency: string; spent: number; budget: number; left: number }
+  | {
+      kind: "mismatched";
+      spent: number;
+      spentCurrency: string;
+      budget: number;
+      budgetCurrency: string;
+    };
+
+/** How much of the budget is left this month, or why that can't be said. */
+export function standing(profile: Profile, ledger: Ledger): Standing {
+  const spent = ledgerTotal(ledger);
+  if (ledger.currency === profile.currency) {
+    return {
+      kind: "aligned",
+      currency: profile.currency,
+      spent,
+      budget: profile.monthlyBudget,
+      left: profile.monthlyBudget - spent,
+    };
+  }
+  return {
+    kind: "mismatched",
+    spent,
+    spentCurrency: ledger.currency,
+    budget: profile.monthlyBudget,
+    budgetCurrency: profile.currency,
+  };
 }
 
 /** The ledger with one more purchase in it. Never mutates what it is given. */

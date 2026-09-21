@@ -14,7 +14,9 @@ import {
   monthKey,
   removePurchase,
   saveLedger,
+  standing,
 } from "../src/config/expenses.js";
+import { createProfile } from "../src/config/profile.js";
 
 describe("monthKey", () => {
   test("is the local-time year and month, zero padded", () => {
@@ -97,6 +99,58 @@ describe("removePurchase", () => {
 
     assert.equal(after.purchases.length, 1);
     assert.equal(after.purchases[0]?.label, "coffee");
+  });
+});
+
+describe("standing", () => {
+  test("aligned: reports spent, budget, and what is left in the shared currency", () => {
+    const profile = createProfile("Salah", 4000, "MAD");
+    const { ledger } = addPurchase(
+      emptyLedger("2026-09", "MAD"),
+      430,
+      "rent and coffee",
+      new Date(2026, 8, 3),
+    );
+
+    const s = standing(profile, ledger);
+
+    assert.equal(s.kind, "aligned");
+    if (s.kind !== "aligned") return;
+    assert.equal(s.currency, "MAD");
+    assert.equal(s.spent, 430);
+    assert.equal(s.budget, 4000);
+    assert.equal(s.left, 3570);
+  });
+
+  test("mismatched: reports spent and budget in their own currencies, and no remainder", () => {
+    const profile = createProfile("Salah", 4000, "EUR");
+    const { ledger } = addPurchase(
+      emptyLedger("2026-09", "MAD"),
+      430,
+      "rent and coffee",
+      new Date(2026, 8, 3),
+    );
+
+    const s = standing(profile, ledger);
+
+    assert.equal(s.kind, "mismatched");
+    if (s.kind !== "mismatched") return;
+    assert.equal(s.spent, 430);
+    assert.equal(s.spentCurrency, "MAD");
+    assert.equal(s.budget, 4000);
+    assert.equal(s.budgetCurrency, "EUR");
+  });
+
+  test("the union genuinely discriminates: a mismatched result carries no left field at all", () => {
+    const profile = createProfile("Salah", 4000, "EUR");
+    const { ledger } = addPurchase(emptyLedger("2026-09", "MAD"), 430, "rent", new Date(2026, 8, 3));
+
+    const s = standing(profile, ledger);
+
+    // Not just "left is undefined" — the property itself is absent, so a
+    // caller cannot read a fabricated remainder off this variant even by
+    // mistake. Object.hasOwn checks presence, not truthiness.
+    assert.equal(Object.hasOwn(s, "left"), false);
   });
 });
 

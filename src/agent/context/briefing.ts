@@ -4,8 +4,8 @@ import type { ModelMessage } from "ai";
 
 import { formatMoney } from "../../config/profile.js";
 import type { Profile } from "../../config/profile.js";
-import { ledgerTotal } from "../../config/expenses.js";
-import type { Ledger, Purchase } from "../../config/expenses.js";
+import { standing } from "../../config/expenses.js";
+import type { Ledger, Purchase, Standing } from "../../config/expenses.js";
 import { daysLeftInMonth } from "../../ui/lib/greeting.js";
 
 /** One purchase as a briefing line, id last so it is easy to quote back. */
@@ -18,9 +18,8 @@ function purchaseLine(purchase: Purchase, currency: string): string {
  * Spent, budget, remainder, and a per-day estimate — all safe to compute
  * because the ledger and the profile agree on currency.
  */
-function spendingLine(profile: Profile, spent: number, days: number): string {
-  const left = profile.monthlyBudget - spent;
-  return `Spent so far this month: ${formatMoney(spent, profile.currency)} of ${formatMoney(profile.monthlyBudget, profile.currency)}. ${formatMoney(left, profile.currency)} left, about ${formatMoney(left / days, profile.currency)} a day.`;
+function spendingLine(s: Extract<Standing, { kind: "aligned" }>, days: number): string {
+  return `Spent so far this month: ${formatMoney(s.spent, s.currency)} of ${formatMoney(s.budget, s.currency)}. ${formatMoney(s.left, s.currency)} left, about ${formatMoney(s.left / days, s.currency)} a day.`;
 }
 
 /**
@@ -28,8 +27,8 @@ function spendingLine(profile: Profile, spent: number, days: number): string {
  * in this app, so `left` and a per-day figure are never computed here — doing
  * so would silently assume a 1:1 rate between two different currencies.
  */
-function mismatchLine(profile: Profile, ledger: Ledger, spent: number): string {
-  return `Spent so far this month: ${formatMoney(spent, ledger.currency)}. The monthly budget is ${formatMoney(profile.monthlyBudget, profile.currency)}. These purchases were recorded in ${ledger.currency}, which is not the profile currency ${profile.currency}; say so rather than converting between them.`;
+function mismatchLine(s: Extract<Standing, { kind: "mismatched" }>): string {
+  return `Spent so far this month: ${formatMoney(s.spent, s.spentCurrency)}. The monthly budget is ${formatMoney(s.budget, s.budgetCurrency)}. These purchases were recorded in ${s.spentCurrency}, which is not the profile currency ${s.budgetCurrency}; say so rather than converting between them.`;
 }
 
 /**
@@ -51,11 +50,8 @@ export function profileBriefing(profile: Profile, ledger: Ledger, now: Date): st
     return `${head} No spending has been recorded yet, so treat the whole budget as still available and say so rather than inventing expenses.`;
   }
 
-  const spent = ledgerTotal(ledger);
-  const summary =
-    ledger.currency === profile.currency
-      ? spendingLine(profile, spent, days)
-      : mismatchLine(profile, ledger, spent);
+  const s = standing(profile, ledger);
+  const summary = s.kind === "aligned" ? spendingLine(s, days) : mismatchLine(s);
 
   return [
     head,

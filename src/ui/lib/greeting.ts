@@ -1,7 +1,7 @@
 /** The line monsa opens with: what is left this month, and what it buys a day. */
 
-import { ledgerTotal } from "../../config/expenses.js";
-import type { Ledger } from "../../config/expenses.js";
+import { standing } from "../../config/expenses.js";
+import type { Ledger, Standing } from "../../config/expenses.js";
 import { formatMoney } from "../../config/profile.js";
 import type { Profile } from "../../config/profile.js";
 
@@ -22,10 +22,14 @@ export function daysLeftInMonth(now: Date): number {
  * compute across different currencies — the structural guarantee that
  * we cannot silently assume a 1:1 exchange rate.
  */
-function matchingCurrencyLine(profile: Profile, spent: number, days: number, month: string): string {
-  const left = profile.monthlyBudget - spent;
+function matchingCurrencyLine(
+  profile: Profile,
+  s: Extract<Standing, { kind: "aligned" }>,
+  days: number,
+  month: string,
+): string {
   return (
-    `Hey ${profile.name} — ${formatMoney(left, profile.currency)} left ` +
+    `Hey ${profile.name} — ${formatMoney(s.left, s.currency)} left ` +
     `for ${month}, ${days} ${days === 1 ? "day" : "days"} to go.`
   );
 }
@@ -35,10 +39,10 @@ function matchingCurrencyLine(profile: Profile, spent: number, days: number, mon
  * knowable — spending in ledger currency and budget in profile currency —
  * without computing a remainder that would silently assume a 1:1 rate.
  */
-function mismatchLine(profile: Profile, ledger: Ledger, spent: number): string {
+function mismatchLine(profile: Profile, s: Extract<Standing, { kind: "mismatched" }>): string {
   return (
-    `Hey ${profile.name} — spent ${formatMoney(spent, ledger.currency)} ` +
-    `against a budget of ${formatMoney(profile.monthlyBudget, profile.currency)}, ` +
+    `Hey ${profile.name} — spent ${formatMoney(s.spent, s.spentCurrency)} ` +
+    `against a budget of ${formatMoney(s.budget, s.budgetCurrency)}, ` +
     `recorded in different currencies.`
   );
 }
@@ -47,13 +51,13 @@ function mismatchLine(profile: Profile, ledger: Ledger, spent: number): string {
 export function greeting(profile: Profile, ledger: Ledger, now: Date): Greeting {
   const days = daysLeftInMonth(now);
   const month = now.toLocaleString("en-US", { month: "long" });
-  const spent = ledgerTotal(ledger);
+  const s = standing(profile, ledger);
 
   return {
     summary:
-      ledger.currency === profile.currency
-        ? matchingCurrencyLine(profile, spent, days, month)
-        : mismatchLine(profile, ledger, spent),
+      s.kind === "aligned"
+        ? matchingCurrencyLine(profile, s, days, month)
+        : mismatchLine(profile, s),
     question: "What do you want to do?",
   };
 }
