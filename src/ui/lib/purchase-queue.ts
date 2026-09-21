@@ -9,9 +9,13 @@ export type QueueAnswer =
   | { kind: "confirmed"; proposal: PurchaseProposal; rest: PurchaseProposal[] }
   | { kind: "declined"; proposal: PurchaseProposal; rest: PurchaseProposal[] };
 
-/** The question put to the user before a purchase is saved. */
+/**
+ * The question put to the user before a purchase is saved. Deliberately
+ * neutral: the same prompt has to read correctly whether they said "I want to
+ * buy this" or "I already bought this".
+ */
 export function purchaseQuestion(proposal: PurchaseProposal, currency: string): string {
-  return `Record ${proposal.label}, ${formatMoney(proposal.amount, currency)}? (y/n)`;
+  return `Save ${proposal.label}, ${formatMoney(proposal.amount, currency)}? (y/n)`;
 }
 
 /**

@@ -37,6 +37,22 @@ describe("removePurchase", () => {
 });
 
 describe("recordPurchase", () => {
+  test("its description tells the model to give advice before calling it", () => {
+    // Also load-bearing: without this the model silently goes back to being a
+    // recorder that never offers an opinion, and no other test would notice.
+    const profile = createProfile("Salah", 4000, "MAD");
+    const { recordPurchase } = buildPurchaseTools(profile);
+    // `description` is typed as text-or-a-function in ai v7; ours is static,
+    // so narrow rather than widen the assertions below.
+    const raw = recordPurchase.description;
+    assert.equal(typeof raw, "string", "the description should be plain text");
+    const description = raw as string;
+
+    assert.match(description, /before you call this/i, "advice must come first");
+    assert.match(description, /ask what it is for/i, "unclear items get a question");
+    assert.match(description, /does NOT save/i, "it still must not claim to write");
+  });
+
   test("its result says the purchase was NOT saved, awaiting confirmation", async () => {
     // This wording is load-bearing: it is what stops the model announcing a
     // purchase as recorded before the user has confirmed it. A refactor that

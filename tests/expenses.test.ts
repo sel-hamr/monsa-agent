@@ -12,6 +12,7 @@ import {
   ledgerTotal,
   loadLedger,
   monthKey,
+  pace,
   removePurchase,
   saveLedger,
   standing,
@@ -238,5 +239,25 @@ describe("loadLedger and saveLedger", () => {
       await saveLedger(emptyLedger("2026-09", "MAD"), nested);
       assert.deepEqual(await loadLedger("2026-09", "MAD", nested), emptyLedger("2026-09", "MAD"));
     });
+  });
+});
+
+describe("pace", () => {
+  test("counts today as a day already spent in", () => {
+    assert.equal(pace(0, new Date(2026, 8, 1, 9, 0)).daysElapsed, 1);
+    assert.equal(pace(0, new Date(2026, 8, 12, 9, 0)).daysElapsed, 12);
+    assert.equal(pace(0, new Date(2026, 8, 30, 23, 0)).daysElapsed, 30);
+  });
+
+  test("averages what was spent over the days it was spent in", () => {
+    assert.equal(pace(1200, new Date(2026, 8, 12)).perDaySoFar, 100);
+    assert.equal(pace(0, new Date(2026, 8, 12)).perDaySoFar, 0);
+  });
+
+  test("the first of the month does not divide by zero", () => {
+    const first = pace(500, new Date(2026, 8, 1));
+    assert.equal(first.daysElapsed, 1);
+    assert.equal(first.perDaySoFar, 500);
+    assert.ok(Number.isFinite(first.perDaySoFar));
   });
 });

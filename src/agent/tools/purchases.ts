@@ -43,9 +43,14 @@ export function buildPurchaseTools(profile: Profile) {
   return {
     recordPurchase: tool({
       description:
-        "Propose recording a purchase the user mentioned. This does NOT save it. " +
-        "The user is asked to confirm first, and may decline. Call this once per " +
-        "distinct purchase.",
+        "Raise a purchase for the user to confirm. This does NOT save it — they " +
+        "are asked first, and may decline. " +
+        "Before you call this, give your honest view on whether the purchase is a " +
+        "good idea this month, in a line or two, using the figures in the briefing. " +
+        "If you cannot tell how much the thing matters to them, ask what it is for " +
+        "instead of calling this. " +
+        "Call it once per distinct purchase, whether they are about to buy it or " +
+        "have already bought it.",
       inputSchema: purchaseProposalSchema,
       execute: ({ amount, label }: PurchaseProposal) =>
         `Proposed ${label}, ${formatMoney(amount, profile.currency)} — NOT saved yet, ` +

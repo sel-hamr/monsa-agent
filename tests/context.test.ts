@@ -57,6 +57,24 @@ describe("profileBriefing", () => {
     assert.match(briefing, /removePurchase/);
   });
 
+  test("says how fast the money is actually going, not only what is left", () => {
+    // noon is the 20th, so 20 days have been spent in; 430 over 20 is 21.5 a day.
+    const briefing = profileBriefing(salah, spentSome().ledger, noon);
+    assert.match(briefing, /20 days/, "days already spent in");
+    assert.match(briefing, /21\.5 MAD a day/, "the real rate so far");
+    assert.match(briefing, /324\.55 MAD a day/, "the rate the remainder allows");
+  });
+
+  test("tells the model to judge a purchase before recording it", () => {
+    const briefing = profileBriefing(salah, spentSome().ledger, noon);
+    assert.match(briefing, /judge it before recording/i);
+    assert.match(briefing, /ask what it is for/i);
+  });
+
+  test("gives the judging instruction even when nothing has been spent yet", () => {
+    assert.match(profileBriefing(salah, nothingSpent, noon), /judge it before recording/i);
+  });
+
   test("flags a currency that no longer matches the profile", () => {
     const inEuros = addPurchase(emptyLedger("2026-09", "EUR"), 30, "coffee", noon).ledger;
     const briefing = profileBriefing(salah, inEuros, noon);
