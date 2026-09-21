@@ -6,16 +6,27 @@ import { formatMoney } from "../../config/profile.js";
 import type { Profile } from "../../config/profile.js";
 import type { PurchaseProposal } from "../../agent/tools/index.js";
 import { answerProposal, purchaseQuestion } from "../lib/purchase-queue.js";
+import { makeSerializer } from "../lib/serial-queue.js";
 
 export type UsePurchaseFlowResult = {
-  /** Whether the next input answers "record this purchase?" rather than the agent. */
-  isConfirming: boolean;
   question: string | null;
   notice: string | null;
   enqueue: (proposals: PurchaseProposal[]) => void;
   /** Handles the input if it belongs to this flow; `false` means pass it on. */
   handleInput: (value: string) => boolean;
 };
+
+/** Why a confirmed purchase was not written: the ledger's currency disagrees with the profile's. */
+function mismatchedCurrencyNotice(
+  proposal: PurchaseProposal,
+  s: Extract<ReturnType<typeof standing>, { kind: "mismatched" }>,
+): string {
+  return (
+    `Not recorded: ${proposal.label} would be saved in ${s.spentCurrency}, but this month's ` +
+    `budget is in ${s.budgetCurrency}. Remove the ${s.spentCurrency} purchases first, or wait ` +
+    `for next month's file.`
+  );
+}
 
 /** "Recorded X — Y left." — or, mismatched, spent and budget with no remainder. */
 function recordedNotice(proposal: PurchaseProposal, profile: Profile, after: Ledger): string {
@@ -38,21 +49,30 @@ export function usePurchaseFlow(
   const [notice, setNotice] = useState<string | null>(null);
 
   /**
-   * Every confirmed write is chained onto this promise rather than fired
+   * Every confirmed write is queued through this rather than fired
    * independently. Two proposals can be queued from one agent turn, and
    * answering them in quick succession must not let two `save()` calls
    * interleave their `loadLedger` / `saveLedger` — the second would load the
    * file before the first has written, and its save would silently discard
-   * the first purchase. `run` always resolves (it catches its own errors),
-   * so the chain itself never rejects and a failed write cannot wedge the
-   * ones queued behind it.
+   * the first purchase. The serializer is robust to a rejecting task, so a
+   * failed write cannot wedge the ones queued behind it.
    */
-  const writeChain = useRef<Promise<void>>(Promise.resolve());
+  const serialize = useRef(makeSerializer());
 
   const save = useCallback(
     async (proposal: PurchaseProposal, forProfile: Profile) => {
       const month = monthKey(new Date());
       const ledger = await loadLedger(month, forProfile.currency);
+
+      // The ledger's currency is fixed when its file is created; a profile
+      // whose currency has since diverged (via /reset) must not have its
+      // purchase silently appended as a bare amount in the old currency.
+      const s = standing(forProfile, ledger);
+      if (s.kind === "mismatched") {
+        setNotice(mismatchedCurrencyNotice(proposal, s));
+        return;
+      }
+
       const { ledger: after } = addPurchase(ledger, proposal.amount, proposal.label, new Date());
       await saveLedger(after);
       setNotice(recordedNotice(proposal, forProfile, after));
@@ -84,12 +104,12 @@ export function usePurchaseFlow(
       }
 
       setNotice(null);
-      const run = () =>
+      serialize.current(() =>
         save(answer.proposal, profile).catch((cause: unknown) => {
           const reason = cause instanceof Error ? cause.message : "unknown error";
           setNotice(`Could not record ${answer.proposal.label}: ${reason}`);
-        });
-      writeChain.current = writeChain.current.then(run);
+        }),
+      );
       return true;
     },
     [pending, profile, save],
@@ -103,7 +123,6 @@ export function usePurchaseFlow(
   const next = pending[0];
 
   return {
-    isConfirming: next !== undefined,
     question:
       next === undefined || profile === null
         ? null

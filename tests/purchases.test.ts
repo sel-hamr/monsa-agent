@@ -1,37 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import test, { describe } from "node:test";
 
 import { buildPurchaseTools } from "../src/agent/tools/purchases.js";
 import { addPurchase, emptyLedger, monthKey, saveLedger } from "../src/config/expenses.js";
 import { createProfile } from "../src/config/profile.js";
-
-/**
- * `removePurchase` reads and writes through `loadLedger`/`saveLedger`'s
- * default directory (`profileDir()`, under the real home directory) — the
- * tool has no way to take a directory override. Rather than reach for a
- * module-loader mock, this redirects `os.homedir()` the same way Node itself
- * resolves it: via `HOME` (POSIX) / `USERPROFILE` (Windows), for the
- * duration of one test.
- */
-async function withRedirectedHome(run: (dir: string) => Promise<void>): Promise<void> {
-  const dir = await mkdtemp(path.join(tmpdir(), "monsa-tools-"));
-  const savedHome = process.env["HOME"];
-  const savedUserProfile = process.env["USERPROFILE"];
-  process.env["HOME"] = dir;
-  process.env["USERPROFILE"] = dir;
-  try {
-    await run(dir);
-  } finally {
-    if (savedHome === undefined) delete process.env["HOME"];
-    else process.env["HOME"] = savedHome;
-    if (savedUserProfile === undefined) delete process.env["USERPROFILE"];
-    else process.env["USERPROFILE"] = savedUserProfile;
-    await rm(dir, { recursive: true, force: true });
-  }
-}
+import { withRedirectedHome } from "./helpers.js";
 
 describe("removePurchase", () => {
   test("a mismatched currency reports spending without a fabricated remainder", async () => {
@@ -60,5 +33,23 @@ describe("removePurchase", () => {
       assert.match(result, /different currencies/);
       assert.doesNotMatch(result, /left/i, "no remainder should be computed across currencies");
     });
+  });
+});
+
+describe("recordPurchase", () => {
+  test("its result says the purchase was NOT saved, awaiting confirmation", async () => {
+    // This wording is load-bearing: it is what stops the model announcing a
+    // purchase as recorded before the user has confirmed it. A refactor that
+    // softens it to something like "ok" must fail this test.
+    const profile = createProfile("Salah", 4000, "MAD");
+    const { recordPurchase } = buildPurchaseTools(profile);
+    const raw = await recordPurchase.execute(
+      { amount: 30, label: "coffee" },
+      { toolCallId: "test", messages: [], context: {} },
+    );
+    assert.equal(typeof raw, "string", "recordPurchase's result is plain text, not a stream");
+    const result = raw as string;
+
+    assert.match(result, /NOT saved/i);
   });
 });

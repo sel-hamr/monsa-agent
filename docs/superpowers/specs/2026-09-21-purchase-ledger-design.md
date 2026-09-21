@@ -236,9 +236,13 @@ told. Spending a turn to inform it is not worth it: the next turn's briefing
 lists the ledger, which simply will not contain the purchase, so the model
 self-corrects from the data.
 
-Ordering against `/reset`: `reset.handleInput` runs first, as it does today. A
-pending purchase confirmation and a pending reset confirmation cannot both be
-open, because each consumes the input that would have started the other.
+Ordering against `/reset`: `reset.handleInput` runs first, as it does today.
+The two *can* both be pending at once — a purchase proposal arrives from an
+agent turn, not from an input the reset flow could have intercepted, so a user
+can have a purchase pending and then type `/reset`. `app.tsx` hides the
+purchase question while a reset confirmation is open, and an effect clears the
+purchase queue once the profile goes `null`, so the reset always wins without
+either flow reading the other's answer.
 
 The tools need the profile's currency and budget, so `src/agent/tools/index.ts`
 changes from a static `tools` object to a `buildTools(profile)` factory, and
