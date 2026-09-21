@@ -6,7 +6,9 @@ import { Greeting } from "./components/Greeting.js";
 import { Input } from "./components/Input.js";
 import { Onboarding } from "./components/Onboarding.js";
 import { useAgent } from "./hooks/use-agent.js";
+import { useLedger } from "./hooks/use-ledger.js";
 import { useProfile } from "./hooks/use-profile.js";
+import { usePurchaseFlow } from "./hooks/use-purchase-flow.js";
 import { useResetFlow } from "./hooks/use-reset-flow.js";
 import { MessageList } from "./components/MessageList.js";
 
@@ -16,11 +18,14 @@ export type AppProps = {
 
 export function App({ name }: AppProps) {
   const { status, profile, pending, completeOnboarding, resetProfile } = useProfile();
-  const { handleSubmit, messages, isLoading } = useAgent(profile);
+  const { ledger, reload } = useLedger(profile);
+  const purchases = usePurchaseFlow(profile, reload);
+  const { handleSubmit, messages, isLoading } = useAgent(profile, purchases.enqueue);
   const reset = useResetFlow(resetProfile);
 
   const onSubmit = (value: string) => {
     if (reset.handleInput(value)) return;
+    if (purchases.handleInput(value)) return;
     void handleSubmit(value);
   };
 
@@ -54,7 +59,7 @@ export function App({ name }: AppProps) {
       </Box>
 
       <Box flexDirection="column" gap={1} marginBottom={1}>
-        <Greeting profile={profile} />
+        {ledger !== null && <Greeting profile={profile} ledger={ledger} />}
         <MessageList messages={messages} />
       </Box>
 
@@ -62,6 +67,8 @@ export function App({ name }: AppProps) {
         <Text color="yellow">Delete {profilePath()}? (y/n)</Text>
       )}
       {reset.notice !== null && <Text dimColor>{reset.notice}</Text>}
+      {purchases.question !== null && <Text color="yellow">{purchases.question}</Text>}
+      {purchases.notice !== null && <Text dimColor>{purchases.notice}</Text>}
 
       {isLoading ? (
         <Box>
