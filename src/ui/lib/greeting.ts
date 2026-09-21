@@ -16,16 +16,44 @@ export function daysLeftInMonth(now: Date): number {
   return lastDay - now.getDate() + 1;
 }
 
-/** What is left this month: the budget, less everything recorded against it. */
+/**
+ * What is left this month when currencies match: the budget, less everything
+ * recorded against it. This function never receives the material needed to
+ * compute across different currencies — the structural guarantee that
+ * we cannot silently assume a 1:1 exchange rate.
+ */
+function matchingCurrencyLine(profile: Profile, spent: number, days: number, month: string): string {
+  const left = profile.monthlyBudget - spent;
+  return (
+    `Hey ${profile.name} — ${formatMoney(left, profile.currency)} left ` +
+    `for ${month}, ${days} ${days === 1 ? "day" : "days"} to go.`
+  );
+}
+
+/**
+ * When the ledger's currency does not match the profile's: state what is
+ * knowable — spending in ledger currency and budget in profile currency —
+ * without computing a remainder that would silently assume a 1:1 rate.
+ */
+function mismatchLine(profile: Profile, ledger: Ledger, spent: number): string {
+  return (
+    `Hey ${profile.name} — spent ${formatMoney(spent, ledger.currency)} ` +
+    `against a budget of ${formatMoney(profile.monthlyBudget, profile.currency)}, ` +
+    `recorded in different currencies.`
+  );
+}
+
+/** The opening line with the time and money left, or a currency mismatch warning. */
 export function greeting(profile: Profile, ledger: Ledger, now: Date): Greeting {
   const days = daysLeftInMonth(now);
   const month = now.toLocaleString("en-US", { month: "long" });
-  const left = profile.monthlyBudget - ledgerTotal(ledger);
+  const spent = ledgerTotal(ledger);
 
   return {
     summary:
-      `Hey ${profile.name} — ${formatMoney(left, profile.currency)} left ` +
-      `for ${month}, ${days} ${days === 1 ? "day" : "days"} to go.`,
+      ledger.currency === profile.currency
+        ? matchingCurrencyLine(profile, spent, days, month)
+        : mismatchLine(profile, ledger, spent),
     question: "What do you want to do?",
   };
 }
