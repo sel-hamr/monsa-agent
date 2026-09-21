@@ -9,11 +9,11 @@ const rent: PurchaseProposal = { amount: 400, label: "rent share" };
 
 describe("purchaseQuestion", () => {
   test("names the purchase and its cost", () => {
-    assert.equal(purchaseQuestion(coffee, "MAD"), "Record coffee, 30 MAD? (y/n)");
+    assert.equal(purchaseQuestion(coffee, "MAD"), "Save coffee, 30 MAD? (y/n)");
   });
 
   test("uses the symbol when the currency has one", () => {
-    assert.equal(purchaseQuestion(coffee, "USD"), "Record coffee, $30? (y/n)");
+    assert.equal(purchaseQuestion(coffee, "USD"), "Save coffee, $30? (y/n)");
   });
 });
 

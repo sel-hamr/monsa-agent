@@ -58,6 +58,23 @@ export type Standing =
       budgetCurrency: string;
     };
 
+export type Pace = {
+  /** Days of this month gone, counting today — today is already being spent in. */
+  daysElapsed: number;
+  /** Average spent per elapsed day, in whatever currency `spent` is. */
+  perDaySoFar: number;
+};
+
+/**
+ * How fast the money is going. `left / daysLeft` says what is affordable from
+ * here; this says what is actually happening, which is what makes a purchase
+ * look reasonable or not.
+ */
+export function pace(spent: number, now: Date): Pace {
+  const daysElapsed = now.getDate();
+  return { daysElapsed, perDaySoFar: spent / daysElapsed };
+}
+
 /** How much of the budget is left this month, or why that can't be said. */
 export function standing(profile: Profile, ledger: Ledger): Standing {
   const spent = ledgerTotal(ledger);
