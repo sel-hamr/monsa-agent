@@ -1,0 +1,49 @@
+{
+  "name": "monsa",
+  "version": "1.0.0",
+  "description": "",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "monsa": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "clean": "node -e \"for (const p of ['dist','node_modules/.cache/tsconfig.build.tsbuildinfo']) fs.rmSync(p,{recursive:true,force:true})\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test \"tests/**/*.test.ts\"",
+    "preview:hero": "tsx scripts/preview-hero.tsx"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.3.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.58",
+    "ai": "^7.0.107",
+    "ink": "^7.1.1",
+    "ink-spinner": "^5.0.0",
+    "react": "^19.3.0",
+    "zod": "^4.6.5"
+  }
+}
